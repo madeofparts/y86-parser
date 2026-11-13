@@ -1,4 +1,8 @@
-#lang plai
+#lang racket
+(require plai/datatype)
+(require plai/test-harness)
+
+(print-only-errors)
 
 (define-type Token
   [IDENTIFIER (i symbol?)]        ;; [A-Za-z]\(A-Za-z|_|[0-9])*
@@ -77,7 +81,8 @@
           ;; parse int or hex token and continue recursing
           (define (in-numeric loc curr)
             (cond
-              [(empty? loc) (start empty false)]
+              [(empty? loc) (cons (INTEGER (string->number curr))
+                                  (start empty false))]
               [(string=? curr "0x") (cons (HEX) (start loc false))]
               [(or (char-numeric? (first loc))
                    (and (char=? #\x (first loc))
@@ -92,7 +97,8 @@
           ;; parse identifier token and continue recursing
           (define (in-ident loc curr)
             (cond
-              [(empty? loc) (start empty false)]
+              [(empty? loc) (cons (IDENTIFIER (string->symbol curr))
+                                  (start empty false))]
               [(or (char-alphabetic? (first loc))
                    (char-numeric? (first loc))
                    (char=? (first loc) #\_))
@@ -107,13 +113,38 @@
           (define (line-comment loc curr)
             (cond
               [(empty? loc) (start empty false)]
-              [(char=? (first loc) (#\newline)) (start (rest loc) false)]
+              [(char=? (first loc) #\newline) (start (rest loc) false)]
               [else (line-comment (rest loc)
                                   (string-append curr (string (first loc))))]))
           ]
-          (start loc0 false)))
+    (start loc0 false)))
+
+;; String -> String
+;; produce string from the given file
+(define (file->string fname)
+  (port->string (open-input-file fname)))
 
 ;; String -> (listof Char)
 ;; produce a listof characters from the given file
 (define (file->list fname)
   (string->list (file->string fname)))
+
+;; String -> (listof Token)
+;; scan a given string
+(define (scan-string str)
+  (scan (string->list str)))
+
+;; String -> (listof Token)
+;; scan a given file
+(define (scan-file fname)
+  (scan-string (file->string fname)))
+
+(test (scan-string "") empty)
+(test (scan-string "(") (list (LPAREN)))
+(test (scan-string "()") (list (LPAREN) (RPAREN)))
+(test (scan-string "(77)22d65") (list (LPAREN) (INTEGER 77) (RPAREN)
+                                      (INTEGER 22) (IDENTIFIER 'd65)))
+(test (scan-string "44#fee fi fo fum\ndid")
+      (list (INTEGER 44) (IDENTIFIER 'did)))
+(test (scan-string "irmovq $123, %r16 # load r16 with 123")
+      (list (IDENTIFIER 'irmovq) (DOLLAR) (INTEGER 123) (COMMA) (PERCENT) (IDENTIFIER 'r16)))
