@@ -8,7 +8,6 @@
   [IDENTIFIER (i symbol?)]        ;; [A-Za-z]\(A-Za-z|_|[0-9])*
   [LPAREN]                        ;; (
   [RPAREN]                        ;; )
-  [COMMA]                         ;; ,
   [PERCENT]                       ;; %
   [DOLLAR]                        ;; $
   [INTEGER (n integer?)]          ;; [0-9]+
@@ -21,7 +20,6 @@
     [IDENTIFIER (i) #f]
     [LPAREN () #f]
     [RPAREN () #f]
-    [COMMA () #f]
     [PERCENT () #f]
     [DOLLAR () #f]
     [INTEGER (n integer?)]
@@ -34,7 +32,6 @@
     [IDENTIFIER (i) (symbol->string i)]
     [LPAREN () "("]
     [RPAREN () ")"]
-    [COMMA () ","]
     [PERCENT () "%"]
     [DOLLAR () "$"]
     [INTEGER (n) (number->string n)]
@@ -63,7 +60,7 @@
                (match (first loc)
                  [#\( (cons (LPAREN) (start (rest loc) false))]
                  [#\) (cons (RPAREN) (start (rest loc) false))]
-                 [#\, (cons (COMMA) (start (rest loc) false))]
+                 [#\, (start (rest loc) false)]
                  [#\% (cons (PERCENT) (start (rest loc) false))]
                  [#\$ (cons (DOLLAR) (start (rest loc) false))]
                  [#\# (line-comment (rest loc) (string (first loc)))]
@@ -147,4 +144,4 @@
 (test (scan-string "44#fee fi fo fum\ndid")
       (list (INTEGER 44) (IDENTIFIER 'did)))
 (test (scan-string "irmovq $123, %r16 # load r16 with 123")
-      (list (IDENTIFIER 'irmovq) (DOLLAR) (INTEGER 123) (COMMA) (PERCENT) (IDENTIFIER 'r16)))
+      (list (IDENTIFIER 'irmovq) (DOLLAR) (INTEGER 123) (PERCENT) (IDENTIFIER 'r16)))
