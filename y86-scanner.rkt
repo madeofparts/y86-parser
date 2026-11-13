@@ -1,11 +1,15 @@
 #lang plai
 
 (define-type Token
-  [IDENTIFIER (i symbol?)] ;; (A-Za-z|_|[0-9])*
+  [IDENTIFIER (i symbol?)]        ;; [A-Za-z]\(A-Za-z|_|[0-9])*
   [LPAREN]                        ;; (
   [RPAREN]                        ;; )
   [COMMA]                         ;; ,
-  [PERCENT])                      ;; %
+  [PERCENT]                       ;; %
+  [DOLLAR]                        ;; $
+  [INTEGER (n integer?)]          ;; [0-9]+
+  [HEX]                           ;; 0x
+  )                      
 
 #;
 (define (fn-for-token t)
@@ -14,7 +18,10 @@
     [LPAREN () #f]
     [RPAREN () #f]
     [COMMA () #f]
-    [PERCENT () #f]))
+    [PERCENT () #f]
+    [DOLLAR () #f]
+    [INTEGER (n integer?)]
+    [HEX]))
 
 ;; Token -> String
 ;; given token, produce the string it represents
@@ -24,16 +31,89 @@
     [LPAREN () "("]
     [RPAREN () ")"]
     [COMMA () ","]
-    [PERCENT () "%"]))
+    [PERCENT () "%"]
+    [DOLLAR () "$"]
+    [INTEGER (n) (number->string n)]
+    [HEX () "0x"]))
+
+;; TODO: "." for directives, "[A-Za-z]... :" for directives???
 
 ;; (listof Token) -> String
 ;; given listof tokens, produce string it represents
 (define (tokens->string lot)
   (string-append " " (foldr (λ (v l) (string-append v " " l)) "" (map token->string lot))))
 
+;; (listof Char) -> (listof Token)
+;; produce the listof tokens corresponding to given list of characters
+;; EFFECTS: signal error if fails to read syntax
+(define (scan loc0)
+  ;; Accumulators:
+  ;; loc is (listof Char)
+  ;; Invariant: remaining chars to be scanned
+  ;; curr is (listof Char) or false
+  ;; Invariant: sequential seen chars 
+  (local [(define (start loc curr)
+            (cond
+              [(empty? loc) empty]
+              [else
+               (match (first loc)
+                 [#\( (cons (LPAREN) (start (rest loc) false))]
+                 [#\) (cons (RPAREN) (start (rest loc) false))]
+                 [#\, (cons (COMMA) (start (rest loc) false))]
+                 [#\% (cons (PERCENT) (start (rest loc) false))]
+                 [#\$ (cons (DOLLAR) (start (rest loc) false))]
+                 [#\# (line-comment (rest loc) (string (first loc)))]
+                 [else
+                  (cond
+                    [(char-numeric? (first loc))
+                     (in-numeric (rest loc) (string (first loc)))]
+                    [(char-alphabetic? (first loc))
+                     (in-ident (rest loc) (string (first loc)))]
+                    [(char-whitespace? (first loc))
+                     (start (rest loc) false)]
+                    [else (error "Bad character" (first loc))])])]))
+
+          ;; (listof Char) String -> (listof Token)
+          ;; parse int or hex token and continue recursing
+          (define (in-numeric loc curr)
+            (cond
+              [(empty? loc) (start empty false)]
+              [(string=? curr "0x") (cons (HEX) (start loc false))]
+              [(or (char-numeric? (first loc))
+                   (and (char=? #\x (first loc))
+                        (string=? curr "0")))
+               (in-numeric (rest loc)
+                           (string-append curr (string (first loc))))]
+              [else
+               (cons (INTEGER (string->number curr))
+                     (start loc false))]))
+          
+          ;; (listof Char) String -> (listof Token)
+          ;; parse identifier token and continue recursing
+          (define (in-ident loc curr)
+            (cond
+              [(empty? loc) (start empty false)]
+              [(or (char-alphabetic? (first loc))
+                   (char-numeric? (first loc))
+                   (char=? (first loc) #\_))
+               (in-ident (rest loc)
+                         (string-append curr (string (first loc))))]
+              [else
+               (cons (IDENTIFIER (string->symbol curr))
+                     (start loc false))]))
+          
+          ;; (listof Char) String -> (listof Token)
+          ;; handle a line comment
+          (define (line-comment loc curr)
+            (cond
+              [(empty? loc) (start empty false)]
+              [(char=? (first loc) (#\newline)) (start (rest loc) false)]
+              [else (line-comment (rest loc)
+                                  (string-append curr (string (first loc))))]))
+          ]
+          (start loc0 false)))
+
 ;; String -> (listof Char)
 ;; produce a listof characters from the given file
 (define (file->list fname)
   (string->list (file->string fname)))
-
-;; (listof Char) -> (listof Token)
