@@ -37,7 +37,7 @@
     [INTEGER (n) (number->string n)]
     [HEX () "0x"]))
 
-;; TODO: "." for directives, "[A-Za-z]... :" for directives???
+;; TODO: labels ex. loop-start:
 
 ;; (listof Token) -> String
 ;; given listof tokens, produce string it represents
@@ -60,10 +60,11 @@
                (match (first loc)
                  [#\( (cons (LPAREN) (start (rest loc) false))]
                  [#\) (cons (RPAREN) (start (rest loc) false))]
-                 [#\, (start (rest loc) false)]
                  [#\% (cons (PERCENT) (start (rest loc) false))]
                  [#\$ (cons (DOLLAR) (start (rest loc) false))]
-                 [#\# (line-comment (rest loc) (string (first loc)))]
+                 [#\# (line-comment (rest loc) (string (first loc)))] ;; # indicates comment
+                 [#\. (line-comment (rest loc) (string (first loc)))] ;; . indicates assembler directive for memory setup
+                 [#\, (start (rest loc) false)]
                  [else
                   (cond
                     [(char-numeric? (first loc))
